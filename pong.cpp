@@ -8,7 +8,7 @@
 
 #define G_FORCE 9.8
 #define DELTA_TIME_IN_MS 10
-#define BALL_RADIUS 5
+#define BALL_RADIUS 9
 #define OUTER_OFFSET 64
 #define PI 3.14
 
@@ -43,6 +43,10 @@ void getBallCount();
 void drawingBoard();
 void movingBall();
 void updateBoard();
+
+void updateVel();
+void updatePos();
+void detectCollision();
 
 int main(){
     initOled();
@@ -127,11 +131,11 @@ void initPos(){
         while (pos){
             j++;
             pos--;
-            if (freeAreaByBall[j]) j++;
+            while (freeAreaIndex[j]) j++;
         }
         freeAreaIndex[j] = 1;
-        int x = j / LCDWidthByBall * BALL_RADIUS,
-            y = j % LCDWidthByBall * BALL_RADIUS;
+        int x = j % LCDWidthByBall * (2 * BALL_RADIUS + 1) + BALL_RADIUS,
+            y = j / LCDWidthByBall * (2 * BALL_RADIUS + 1) + BALL_RADIUS;
         listPos[i][0] = x;
         listPos[i][1] = y;
         freeAreaByBall--;
@@ -140,6 +144,8 @@ void initPos(){
 }
 
 void updateBoard(){
+    for (int i = 0; i < oled.getLCDHeight() * oled.getLCDWidth(); i++)
+        boardBuffer[i] = 0;
     for(int i = 0; i < ballCount; i++){
         int8_t x0 = listPos[i][0], y0 = listPos[i][1];
         int8_t radius = BALL_RADIUS;
@@ -150,7 +156,7 @@ void updateBoard(){
         int8_t y = radius;
 
         for (unsigned char i=y0-radius; i<=y0+radius; i++){
-            pixel(x0, i, color, mode);
+            boardBuffer[flatIndex(x0, i)] = i;
         }
 
         while (x<y){
@@ -164,35 +170,45 @@ void updateBoard(){
             f += ddF_x;
 
             for (unsigned char i=y0-y; i<=y0+y; i++){
-                pixel(x0+x, i, color, mode);
-                pixel(x0-x, i, color, mode);
+                boardBuffer[flatIndex(x0+x, i)] = i;
+                boardBuffer[flatIndex(x0-x, i)] = i;
             }
             for (unsigned char i=y0-x; i<=y0+x; i++){
-                pixel(x0+y, i, color, mode);
-                pixel(x0-y, i, color, mode);
+                boardBuffer[flatIndex(x0+y, i)] = i;
+                boardBuffer[flatIndex(x0-y, i)] = i;
             }
 
-            pixel(x0 + x, y0 + y, color, mode);
-            pixel(x0 - x, y0 + y, color, mode);
-            pixel(x0 + x, y0 - y, color, mode);
-            pixel(x0 - x, y0 - y, color, mode);
+            boardBuffer[flatIndex(x0 + x, y0 + y)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 - x, y0 + y)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 + x, y0 - y)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 - x, y0 - y)] = i + OUTER_OFFSET;
 
-            pixel(x0 + y, y0 + x, color, mode);
-            pixel(x0 - y, y0 + x, color, mode);
-            pixel(x0 + y, y0 - x, color, mode);
-            pixel(x0 - y, y0 - x, color, mode);
+            boardBuffer[flatIndex(x0 + y, y0 + x)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 - y, y0 + x)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 + y, y0 - x)] = i + OUTER_OFFSET;
+            boardBuffer[flatIndex(x0 - y, y0 - x)] = i + OUTER_OFFSET;
         }
 
-        pixel(x0, y0+radius, color, mode);
-        pixel(x0, y0-radius, color, mode);
-        pixel(x0+radius, y0, color, mode);
-        pixel(x0-radius, y0, color, mode);
+        boardBuffer[flatIndex(x0, y0+radius)] = i + OUTER_OFFSET;
+        boardBuffer[flatIndex(x0, y0-radius)] = i + OUTER_OFFSET;
+        boardBuffer[flatIndex(x0+radius, y0)] = i + OUTER_OFFSET;
+        boardBuffer[flatIndex(x0-radius, y0)] = i + OUTER_OFFSET;
     }
 }
 
 void drawingBoard(){
+    oled.clear(PAGE);
     for (int i = 0; i < oled.getLCDHeight() * oled.getLCDWidth(); i++){
         if (boardBuffer[i] < OUTER_OFFSET) continue;
         oled.pixel(getX(i), getY(i));
+    }
+    oled.display();
+}
+
+void movingBall(){
+    static int initFlag = 0;
+    if (!initFlag){
+        initFlag = 1;
+        return;
     }
 }
