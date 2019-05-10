@@ -7,14 +7,16 @@
 #include "Libs/OLED/gpio/gpio.h"
 
 #define G_FORCE 9.8
-#define DELTA_TIME_IN_MS 10
+#define DELTA_TIME_IN_US 10e3
+#define VEL_CAP_IN_MS 10
 #define BALL_RADIUS 9
 #define OUTER_OFFSET 64
 #define PI 3.14
 
 using namespace std;
 
-int **listPos, **listVel;
+float **listPos;
+float **listVel;
 char *boardBuffer;
 int ballCount;
 int LCDWidthByBall, LCDHeightByBall, LCDAreaByBall;
@@ -44,19 +46,18 @@ void drawingBoard();
 void movingBall();
 void updateBoard();
 
-void updateVel();
-void updatePos();
+void updateVelPos(float accelX, float accelY);
 void detectCollision();
 
 int main(){
     initOled();
     getBallCount();
 
-    listPos = new int* [ballCount];
-    listVel = new int* [ballCount];
+    listPos = new float* [ballCount];
+    listVel = new float* [ballCount];
     for (int i = 0; i < ballCount; i++){
-        listPos[i] = new int[2];
-        listVel[i] = new int[2]{0};
+        listPos[i] = new float[2];
+        listVel[i] = new float[2]{0};
     }
     boardBuffer = new char[oled.getLCDHeight() * oled.getLCDWidth()];
 
@@ -64,7 +65,7 @@ int main(){
     while(true){
         updateBoard();
         drawingBoard();
-        // movingBall();
+        movingBall();
         usleep(15);
     }
     return 0;
@@ -209,6 +210,53 @@ void movingBall(){
     static int initFlag = 0;
     if (!initFlag){
         initFlag = 1;
+        imu = new LSM9DS0(0x6B, 0x1D);
+        uint16_t imuResult = imu->begin();
+        cout<<hex<<"Chip ID: 0x"<<imuResult<<dec<<" (should be 0x49d4)"<<endl;
         return;
+    }
+    imu->newXData();
+    imu->readAccel();
+    float accelX = imu->calcAccel(imu->ax) * G_FORCE,
+          accelY = imu->calcAccel(imu->ay) * G_FORCE;
+    updateVelPos(accelX, accelY);
+}
+
+void updateVelPos(float accelX, float accelY){
+    for (int i = 0; i < ballCount; i++){
+        float temp_vel_x = listVel[i][0] + accelX * DELTA_TIME_IN_US * 1e-6;
+        float temp_vel_y = listVel[i][1] + accelY * DELTA_TIME_IN_US * 1e-6;
+        float vel = sqrt(pow(temp_vel_x, 2) + pow(temp_vel_y, 2));
+        if (vel > VEL_CAP_IN_MS){
+            temp_vel_x = VEL_CAP_IN_MS * temp_vel_x / vel;
+            temp_vel_y = VEL_CAP_IN_MS * temp_vel_y / vel;
+        }
+        float temp_pos_x = listPos[i][0] - (listVel[i][0] * DELTA_TIME_IN_US * 1e-6 + 1/2 * accelX * pow(DELTA_TIME_IN_US, 2) * 1e-12);
+        float temp_pos_y = listPos[i][0] + (listVel[i][0] * DELTA_TIME_IN_US * 1e-6 + 1/2 * accelX * pow(DELTA_TIME_IN_US, 2) * 1e-12);
+        float boundLeft = temp_pos_x - BALL_RADIUS;
+        float boundRight = temp_pos_x + BALL_RADIUS;
+        float boundTop = temp_vel_y - BALL_RADIUS;
+        float boundDown = temp_vel_y + BALL_RADIUS;
+        if (boundLeft < 0){
+            boundLeft = -boundLeft;
+            temp_vel_x = -temp_vel_x;
+        }
+        else if (boundRight > oled.getLCDWidth() - 1){
+            boundRight = 2*(oled.getLCDWidth() - 1) - boundRight;
+            temp_vel_x = -temp_vel_x;
+        }
+        if (boundTop < 0){
+            boundTop = -boundTop;
+            temp_vel_y = -temp_vel_y;
+        }
+        else if (boundDown > oled.getLCDHeight() - 1){
+            boundDown = 2*(oled.getLCDHeight() - 1) - boundDown;
+            temp_vel_y = -temp_vel_y;
+        }
+
+        listPos[i][0] = temp_pos_x;
+        listPos[i][1] = temp_pos_y;
+        listVel[i][0] = temp_vel_x;
+        listVel[i][1] = temp_vel_y;
     }
 }
