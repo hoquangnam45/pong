@@ -66,7 +66,7 @@ int main(){
         updateBoard();
         drawingBoard();
         movingBall();
-        usleep(15);
+        usleep(DELTA_TIME_IN_US);
     }
     return 0;
 }
@@ -239,18 +239,22 @@ void updateVelPos(float accelX, float accelY){
         float boundDown = temp_vel_y + BALL_RADIUS;
         if (boundLeft < 0){
             boundLeft = -boundLeft;
+            temp_pos_x = boundLeft + BALL_RADIUS;
             temp_vel_x = -temp_vel_x;
         }
         else if (boundRight > oled.getLCDWidth() - 1){
             boundRight = 2*(oled.getLCDWidth() - 1) - boundRight;
+            temp_pos_x = boundRight - BALL_RADIUS;
             temp_vel_x = -temp_vel_x;
         }
         if (boundTop < 0){
             boundTop = -boundTop;
+            temp_pos_y = boundTop + BALL_RADIUS;
             temp_vel_y = -temp_vel_y;
         }
         else if (boundDown > oled.getLCDHeight() - 1){
             boundDown = 2*(oled.getLCDHeight() - 1) - boundDown;
+            temp_pos_y = boundDown - BALL_RADIUS;
             temp_vel_y = -temp_vel_y;
         }
 
