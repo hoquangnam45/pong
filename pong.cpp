@@ -6,12 +6,13 @@
 #include "Libs/OLED/oled/Edison_OLED.h"
 #include "Libs/OLED/gpio/gpio.h"
 
-#define G_FORCE 9.8
-#define DELTA_TIME_IN_US 10e3
+#define G_FORCE 10
+#define DELTA_TIME_IN_US 10e5
 #define VEL_CAP_IN_MS 10
-#define BALL_RADIUS 9
+#define BALL_RADIUS 2
 #define OUTER_OFFSET 64
 #define PI 3.14
+#define POWER_LOSS_RATIO 1
 
 using namespace std;
 
@@ -66,7 +67,7 @@ int main(){
         updateBoard();
         drawingBoard();
         movingBall();
-        usleep(DELTA_TIME_IN_US);
+        //usleep(DELTA_TIME_IN_US * 1e-3);
     }
     return 0;
 }
@@ -227,37 +228,45 @@ void updateVelPos(float accelX, float accelY){
         float temp_vel_x = listVel[i][0] + accelX * DELTA_TIME_IN_US * 1e-6;
         float temp_vel_y = listVel[i][1] + accelY * DELTA_TIME_IN_US * 1e-6;
         float vel = sqrt(pow(temp_vel_x, 2) + pow(temp_vel_y, 2));
+        //cout << "Vel1: " << temp_vel_x << " " << temp_vel_y << endl;
         if (vel > VEL_CAP_IN_MS){
             temp_vel_x = VEL_CAP_IN_MS * temp_vel_x / vel;
             temp_vel_y = VEL_CAP_IN_MS * temp_vel_y / vel;
         }
         float temp_pos_x = listPos[i][0] - (listVel[i][0] * DELTA_TIME_IN_US * 1e-6 + 1/2 * accelX * pow(DELTA_TIME_IN_US, 2) * 1e-12);
-        float temp_pos_y = listPos[i][0] + (listVel[i][0] * DELTA_TIME_IN_US * 1e-6 + 1/2 * accelX * pow(DELTA_TIME_IN_US, 2) * 1e-12);
+        float temp_pos_y = listPos[i][1] + (listVel[i][1] * DELTA_TIME_IN_US * 1e-6 + 1/2 * accelY * pow(DELTA_TIME_IN_US, 2) * 1e-12);
         float boundLeft = temp_pos_x - BALL_RADIUS;
         float boundRight = temp_pos_x + BALL_RADIUS;
-        float boundTop = temp_vel_y - BALL_RADIUS;
-        float boundDown = temp_vel_y + BALL_RADIUS;
+        float boundTop = temp_pos_y - BALL_RADIUS;
+        float boundDown = temp_pos_y + BALL_RADIUS;
         if (boundLeft < 0){
             boundLeft = -boundLeft;
             temp_pos_x = boundLeft + BALL_RADIUS;
-            temp_vel_x = -temp_vel_x;
+            temp_vel_x = sqrt(POWER_LOSS_RATIO) * -temp_vel_x;
         }
         else if (boundRight > oled.getLCDWidth() - 1){
             boundRight = 2*(oled.getLCDWidth() - 1) - boundRight;
             temp_pos_x = boundRight - BALL_RADIUS;
-            temp_vel_x = -temp_vel_x;
+            temp_vel_x = sqrt(POWER_LOSS_RATIO) * -temp_vel_x;
         }
         if (boundTop < 0){
             boundTop = -boundTop;
             temp_pos_y = boundTop + BALL_RADIUS;
-            temp_vel_y = -temp_vel_y;
+            temp_vel_y = sqrt(POWER_LOSS_RATIO) * -temp_vel_y;
         }
         else if (boundDown > oled.getLCDHeight() - 1){
             boundDown = 2*(oled.getLCDHeight() - 1) - boundDown;
             temp_pos_y = boundDown - BALL_RADIUS;
-            temp_vel_y = -temp_vel_y;
+            temp_vel_y = sqrt(POWER_LOSS_RATIO) * -temp_vel_y;
         }
-
+        /*
+        cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << endl;
+        cout << "Accel: " << accelX << " " << accelY << endl;
+        cout << "Pos0: "  << listPos[i][0] << " " << listPos[i][1] << endl;
+        cout << "Vel0: " << listVel[i][0] << " " << listVel[i][1] << endl;
+        cout << "Pos1: " << temp_pos_x << " " << temp_pos_y << endl;
+        cout << "Vel1: " << temp_vel_x << " " << temp_vel_y << endl;
+        cout << endl;*/
         listPos[i][0] = temp_pos_x;
         listPos[i][1] = temp_pos_y;
         listVel[i][0] = temp_vel_x;
