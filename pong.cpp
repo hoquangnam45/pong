@@ -6,7 +6,7 @@
 #include "Libs/OLED/oled/Edison_OLED.h"
 #include "Libs/OLED/gpio/gpio.h"
 
-#define G_FORCE 10
+#define G_FORCE 9.8
 #define DELTA_TIME_IN_US 10e5
 #define VEL_CAP_IN_MS 10
 #define BALL_RADIUS 2
@@ -47,7 +47,7 @@ void drawingBoard();
 void movingBall();
 void updateBoard();
 
-void updateVelPos(float accelX, float accelY);
+void updateVelPos(float accelX, float accelY, float accelZ);
 void detectCollision();
 
 int main(){
@@ -220,10 +220,19 @@ void movingBall(){
     imu->readAccel();
     float accelX = imu->calcAccel(imu->ax) * G_FORCE,
           accelY = imu->calcAccel(imu->ay) * G_FORCE;
-    updateVelPos(accelX, accelY);
+          accelZ = imu->calcAccel(imu->ay) * G_FORCE;
+    updateVelPos(accelX, accelY, accelZ);
 }
 
-void updateVelPos(float accelX, float accelY){
+void updateVelPos(float accelX, float accelY, float accelZ){
+    float total_accel = sqrt(pow(accelX,2) + pow(accelY,2) + pow(accelZ,2));
+    float total_accelXY =  sqrt(pow(accelX,2) + pow(accelY,2));
+    float inducedAccel = 1 - total_accel;
+    float inducedAccelXY = inducedAccel / total_accel * total_accelXY;
+    float inducedAccelX = inducedAccelXY / total_accelXY * accelX;
+    float inducedAccelY = inducedAccelXY / total_accelXY * accelY; 
+    accelX += inducedAccelX;
+    accelY += inducedAccelY;
     for (int i = 0; i < ballCount; i++){
         float temp_vel_x = listVel[i][0] + accelX * DELTA_TIME_IN_US * 1e-6;
         float temp_vel_y = listVel[i][1] + accelY * DELTA_TIME_IN_US * 1e-6;
