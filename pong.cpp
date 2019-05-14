@@ -219,7 +219,7 @@ void movingBall(){
     imu->newXData();
     imu->readAccel();
     float accelX = imu->calcAccel(imu->ax) * G_FORCE,
-          accelY = imu->calcAccel(imu->ay) * G_FORCE;
+          accelY = imu->calcAccel(imu->ay) * G_FORCE,
           accelZ = imu->calcAccel(imu->ay) * G_FORCE;
     updateVelPos(accelX, accelY, accelZ);
 }
